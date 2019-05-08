@@ -1,0 +1,15 @@
+[package]
+name = "branch-time"
+version = "0.1.0"
+authors = ["Kevin Jackson <kevin.jackson@thehutgroup.com>"]
+edition = "2018"
+
+[dependencies]
+git2 = "0.8"
+reqwest = "0.9.16"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+chrono = "0.4"
+regex = "1"
+docopt = "1.1.0"
