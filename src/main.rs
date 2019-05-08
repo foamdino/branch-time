@@ -30,14 +30,14 @@ struct GithubCommit {
     commit: GithubCommitInfo,
 }
 
-fn commit_to_formatted_output(commit: Commit) -> Result<String, Error> {
+fn commit_to_formatted_output(commit: Commit, github_repo: &str) -> Result<String, Error> {
     let sha = commit.id().to_string();
     let commit_ts = commit.time().seconds();
     let message = commit.summary().unwrap();
 
     match extract_pr_from_commit_message(message) {
         Some(pr_number) => {
-            let branch_time = fetch_github_info_for_commit(commit_ts, pr_number).unwrap();
+            let branch_time = fetch_github_info_for_commit(commit_ts, pr_number, github_repo).unwrap();
             match branch_time {
                 Some(bt) => Ok(format!("{},{},{},{}", sha, commit_ts, bt, message).to_owned()),
                 None => Ok(format!("{},{},unknown,{}", sha, commit_ts, message).to_owned())
@@ -47,10 +47,10 @@ fn commit_to_formatted_output(commit: Commit) -> Result<String, Error> {
     }
 }
 
-fn fetch_github_info_for_commit(commit_ts: i64, pr_number: &str) -> Result<Option<i64>, Box<dyn std::error::Error>> {
+fn fetch_github_info_for_commit(commit_ts: i64, pr_number: &str, github_repo: &str) -> Result<Option<i64>, Box<dyn std::error::Error>> {
     match env::var("GITHUB_STATS_TOKEN") {
         Ok(val) => {
-            let url = format!("https://api.github.com/repos/THG-Voyager/voyager/pulls/{}/commits?access_token={}", pr_number, val);
+            let url = format!("https://api.github.com/repos/{}/pulls/{}/commits?access_token={}", github_repo, pr_number, val);
             let json = reqwest::get(url.as_str())?.json::<Vec<GithubCommit>>()?;
             match json.get(0) {
                 Some(c) => {
@@ -75,7 +75,7 @@ fn extract_pr_from_commit_message(commit_message: &str) -> Option<&str> {
     }
 }
 
-fn get_commit_log(repo: Repository, from: &str, to: &str) -> Result<String, Error> {
+fn get_commit_log(repo: Repository, from: &str, to: &str, github_repo: &str) -> Result<String, Error> {
     let f = repo.revparse_single(from)?;
     let t = repo.revparse_single(to)?;
     let mut revwalk = repo.revwalk()?;
@@ -87,7 +87,7 @@ fn get_commit_log(repo: Repository, from: &str, to: &str) -> Result<String, Erro
 
     let commit_list: Vec<String> = revwalk.map(|c| {
         let commit = repo.find_commit(c.unwrap()).unwrap();
-        commit_to_formatted_output(commit).unwrap()
+        commit_to_formatted_output(commit, github_repo).unwrap()
     }).collect();
 
     let output = commit_list.join("\n");
@@ -97,7 +97,7 @@ fn get_commit_log(repo: Repository, from: &str, to: &str) -> Result<String, Erro
 fn main() {
     // Docopt usage string.
     const USAGE: &str = "
-Usage: branch-time <git_repo_path> <from_tag> <to_tag>
+Usage: branch-time <git_repo_path> <github_repo> <from_tag> <to_tag>
 ";
 
     let args = Docopt::new(USAGE)
@@ -107,7 +107,8 @@ Usage: branch-time <git_repo_path> <from_tag> <to_tag>
         Repository::open(
             args.get_str("<git_repo_path>")).expect("failed to open repo"),
         args.get_str("<from_tag>"),
-        args.get_str("<to_tag>")).expect("unable to get commit log");
+        args.get_str("<to_tag>"),
+    args.get_str("<github_repo>")).expect("unable to get commit log");
 
     let output_file = format!("/tmp/branch-times-{}-{}.csv", args.get_str("<from_tag>").replace("/", "-"), args.get_str("<to_tag>").replace("/", "-"));
     fs::write(&output_file, processed_commits).expect(&format!("couldn't write to file: {}", &output_file));
@@ -121,7 +122,7 @@ mod tests {
     #[test]
     fn test_get_commit_log() {
         let repo = Repository::open("/Users/kevj/projects/voyager").expect("cannot open git repo");
-        let r = get_commit_log(repo, "origin/release/2.167.x", "origin/release/2.168.x");
+        let r = get_commit_log(repo, "origin/release/2.167.x", "origin/release/2.168.x", "THG-Voyager/voyager");
         assert!(r.is_ok());
     }
 
@@ -130,7 +131,7 @@ mod tests {
         let repo = Repository::open("/Users/kevj/projects/voyager").expect("cannot open git repo");
         let commit_id = Oid::from_str("77728b3066ce7b179acdfac776512f570fffdaae").unwrap();
         let commit = repo.find_commit(commit_id).unwrap();
-        let r = commit_to_formatted_output(commit);
+        let r = commit_to_formatted_output(commit, "THG-Voyager/voyager");
         assert!(r.is_ok());
         assert_eq!("77728b3066ce7b179acdfac776512f570fffdaae,1522335500,4132,VGR-8087 - Adding tests for verifying required products service is decremented (#4729)", r.unwrap())
     }
@@ -138,7 +139,7 @@ mod tests {
     #[test]
     fn test_fetch_github_info_for_commit() {
         let pr_number = "4729";
-        let r = fetch_github_info_for_commit(1522335500, pr_number);
+        let r = fetch_github_info_for_commit(1522335500, pr_number, "THG-Voyager/voyager");
         assert!(r.is_ok());
     }
 
