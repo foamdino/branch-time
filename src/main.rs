@@ -26,7 +26,7 @@ struct GithubCommitInfo {
 #[derive(Debug, Deserialize)]
 struct GithubCommit {
     sha: String,
-    commit: GithubCommitInfo,
+    commit: GithubCommitInfo
 }
 
 fn commit_to_formatted_output(commit: Commit, github_repo: &str, access_token: &str) -> Result<String, Error> {
@@ -49,21 +49,17 @@ fn commit_to_formatted_output(commit: Commit, github_repo: &str, access_token: &
 fn fetch_github_info_for_commit(commit_ts: i64, pr_number: &str, github_repo: &str, access_token: &str) -> Option<i64> {
     let url = format!("https://api.github.com/repos/{}/pulls/{}/commits?access_token={}", github_repo, pr_number, access_token);
     let json = reqwest::get(url.as_str()).expect("cannot fetch data for commit").json::<Vec<GithubCommit>>().expect("cannot parse data for commit");
-    match json.first() {
-        Some(c) => {
-            let dt = &c.commit.author.date.parse::<DateTime<Utc>>().expect("cannot format datetime");
-            Some(commit_ts - dt.timestamp())
-        },
-        None => None
-    }
+    json.first().map(|c| {
+        let dt = &c.commit.author.date.parse::<DateTime<Utc>>().expect("cannot format datetime");
+        commit_ts - dt.timestamp()
+    })
 }
 
 fn extract_pr_from_commit_message(commit_message: &str) -> Option<&str> {
     let re = Regex::new(r"\(#(\d+)\)").unwrap();
-    match re.captures(commit_message) {
-        Some(pr_number) => Some(pr_number.get(1).unwrap().as_str()),
-        None => None
-    }
+    re.captures(commit_message).map(|pr_number| {
+        pr_number.get(1).unwrap().as_str()
+    })
 }
 
 fn get_commit_log(access_token: &str, repo: Repository, from: &str, to: &str, github_repo: &str) -> Result<String, Error> {
@@ -105,7 +101,7 @@ Usage: branch-time <git_repo_path> <github_repo> <from_tag> <to_tag>
                 args.get_str("<github_repo>")).expect("unable to get commit log");
 
             let output_file = format!("/tmp/branch-times-{}-{}.csv", args.get_str("<from_tag>").replace("/", "-"), args.get_str("<to_tag>").replace("/", "-"));
-            fs::write(&output_file, format!("commit_sha,commit_ts,pull_request,branch_time_seconds,author,message\n{}",processed_commits)).expect(&format!("couldn't write to file: {}", &output_file));
+            fs::write(&output_file, format!("commit_sha,commit_ts,pull_request,branch_time_seconds,author,message\n{}",processed_commits)).unwrap_or_else(|_| panic!("couldn't write to file: {}", &output_file));
         },
         Err(e) => {
             panic!("Token not found! {}", e);
@@ -147,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_extract_pr_from_commit_message() {
-        let message = "77728b3066ce7b179acdfac776512f570fffdaae,1522335500,VGR-8087 - Adding tests for verifying required products service is decremented (#4729)";
+        let message = "VGR-8087 - Adding tests for verifying required products service is decremented (#4729)";
         let pr_number = extract_pr_from_commit_message(message);
         assert_eq!("4729", pr_number.unwrap());
     }
