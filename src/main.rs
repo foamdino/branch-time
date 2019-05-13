@@ -91,22 +91,16 @@ Usage: branch-time <git_repo_path> <github_repo> <from_tag> <to_tag>
         .and_then(|d| d.parse())
         .unwrap_or_else(|e| e.exit());
 
-    match env::var("GITHUB_STATS_TOKEN") {
-        Ok(access_token) => {
-            let processed_commits = get_commit_log(&access_token,
-                Repository::open(
-                    args.get_str("<git_repo_path>")).expect("failed to open repo"),
-                args.get_str("<from_tag>"),
-                args.get_str("<to_tag>"),
-                args.get_str("<github_repo>")).expect("unable to get commit log");
+    let access_token = env::var("GITHUB_STATS_TOKEN").expect("Token not found - have you configured the env var GITHUB_STATS_TOKEN??");
+    let processed_commits = get_commit_log(&access_token,
+                                           Repository::open(
+                                               args.get_str("<git_repo_path>")).expect("failed to open repo"),
+                                           args.get_str("<from_tag>"),
+                                           args.get_str("<to_tag>"),
+                                           args.get_str("<github_repo>")).expect("unable to get commit log");
 
-            let output_file = format!("/tmp/branch-times-{}-{}.csv", args.get_str("<from_tag>").replace("/", "-"), args.get_str("<to_tag>").replace("/", "-"));
-            fs::write(&output_file, format!("commit_sha,commit_ts,pull_request,branch_time_seconds,author,message\n{}",processed_commits)).unwrap_or_else(|_| panic!("couldn't write to file: {}", &output_file));
-        },
-        Err(e) => {
-            panic!("Token not found! {}", e);
-        }
-    }
+    let output_file = format!("/tmp/branch-times-{}-{}.csv", args.get_str("<from_tag>").replace("/", "-"), args.get_str("<to_tag>").replace("/", "-"));
+    fs::write(&output_file, format!("commit_sha,commit_ts,pull_request,branch_time_seconds,author,message\n{}",processed_commits)).unwrap_or_else(|_| panic!("couldn't write to file: {}", &output_file));
 }
 
 
