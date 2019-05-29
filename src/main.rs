@@ -69,8 +69,8 @@ fn get_commit_log(access_token: &str, repo: Repository, from: &str, to: &str, gi
     revwalk.push(t.id())?;
     let base = repo.merge_base(f.id(), t.id())?;
     let o = repo.find_object(base, Some(ObjectType::Commit))?;
-    revwalk.push(o.id());
-    revwalk.hide(f.id());
+    revwalk.push(o.id())?;
+    revwalk.hide(f.id())?;
 
     let commit_list: Vec<String> = revwalk.map(|c| {
         let commit = repo.find_commit(c.unwrap()).unwrap();
