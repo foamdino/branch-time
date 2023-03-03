@@ -5,7 +5,7 @@ authors = ["Kevin Jackson <kevin.jackson@thehutgroup.com>"]
 edition = "2018"
 
 [dependencies]
-git2 = "0.8"
+git2 = "0.16.1"
 reqwest = "0.9.16"
 serde = "1.0"
 serde_derive = "1.0"
