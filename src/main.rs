@@ -5,6 +5,7 @@ use git2::{Error, Repository, Commit, ObjectType, Oid};
 use chrono::prelude::{DateTime, Utc};
 use regex::Regex;
 use docopt::Docopt;
+use reqwest::Client;
 
 #[macro_use]
 extern crate serde_derive;
@@ -47,8 +48,12 @@ fn commit_to_formatted_output(commit: Commit, github_repo: &str, access_token: &
 }
 
 fn fetch_github_info_for_commit(commit_ts: i64, pr_number: &str, github_repo: &str, access_token: &str) -> Option<i64> {
-    let url = format!("https://api.github.com/repos/{}/pulls/{}/commits?access_token={}", github_repo, pr_number, access_token);
-    let json = reqwest::get(url.as_str()).expect("cannot fetch data for commit").json::<Vec<GithubCommit>>().expect("cannot parse data for commit");
+    let url = format!("https://api.github.com/repos/{}/pulls/{}/commits", github_repo, pr_number);
+    let client = Client::new();
+    let json = client.get(url.as_str())
+        .header("Authorization", format!("token {}", access_token))
+        .send().expect("cannot fetch data for commit").json::<Vec<GithubCommit>>().expect("cannot parse data for commit");
+
     json.first().map(|c| {
         let dt = &c.commit.author.date.parse::<DateTime<Utc>>().expect("cannot format datetime");
         commit_ts - dt.timestamp()
